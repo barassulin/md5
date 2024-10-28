@@ -8,19 +8,21 @@ server of md5
 import socket
 import protocol
 from threading import Thread
+from threading import Lock
 
 
 QUEUE_SIZE = 10
 IP = '0.0.0.0'
 PORT = 8080
-STR = 'fcea920f7412b5da7be0cf42b8c93759'
+STR = '25d55ad283aa400af464c76d713c07ad'
 global CURRENT
 CURRENT = 0
-JUMPS = 1000000
-MAX_NUMBER = 9999999
+JUMPS = 100000
+MAX_NUMBER = 99999999
 global found, found_num
 found = False
 found_num = None
+lock = Lock()
 
 
 def handle_connection(client_socket, client_address):
@@ -30,38 +32,45 @@ def handle_connection(client_socket, client_address):
     :param client_address: the remote address
     :return: None
     """
-    global CURRENT
+    global found, found_num, CURRENT
+    global lock
     try:
         print('New connection received from ' + client_address[0] + ':' + str(client_address[1]))
         # handle the communication
-        data = client_socket.recv(1).decode()
-        if data == "":
-            data = None
+        cores = client_socket.recv(1).decode()
+        if cores == "":
+            cores = None
         else:
-            protocol.recv_protocol(client_socket, data)
-            if data.isnumeric():
-                data = int(data)
-            client_socket.send(protocol.send_protocol(f"{CURRENT}/{JUMPS}/{STR}".encode()))
-            CURRENT = CURRENT + JUMPS*data
-            print("got here first")
-            data = client_socket.recv(1).decode()
-            print("got here first2")
+            cores = protocol.recv_protocol(client_socket, cores)
+            if cores.isnumeric():
+                cores = int(cores)
+            print("cores")
+            print(cores)
+            while not found:
+                lock.acquire()
+                client_socket.send(protocol.send_protocol(f"{CURRENT}/{JUMPS}/{STR}".encode()))
+                CURRENT = CURRENT + JUMPS*cores
+                print(CURRENT)
+                print("CURRENT")
+                lock.release()
+                print("got here first")
+                data = client_socket.recv(1).decode()
+                print("got here first2")
 
-            if data == "":
-                data = None
-                print("none")
-            else:
-                print("yes")
-                data = protocol.recv_protocol(client_socket, data)
-                print("goy here")
-                print(data)
-                data2 = data.split("/", 1)
-                print(data2[0])
-                if data2[0] == "True":
-                    print("true")
-                    global found, found_num
-                    found = True
-                    found_num = int(data.split("/", 1)[1])
+                if data == "":
+                    data = None
+                    print("none")
+                else:
+                    print("yes")
+                    data = protocol.recv_protocol(client_socket, data)
+                    print("goy here")
+                    print(data)
+                    data2 = data.split("/", 1)
+                    print(data2[0])
+                    if data2[0] == "True":
+                        print("true")
+                        found = True
+                        found_num = int(data.split("/", 1)[1])
 
     except socket.error as err:
         print('received socket exception - ' + str(err))
